@@ -1,0 +1,91 @@
+OBJETIVO SECCION 3: PREGUNTAS SOBRE IMPALA Y REALIZAR ALGUNA CONSULTA COMPARANDO CON HIVE
+
+PREGUNTA 1: ¿Qué es Impala?
+
+RESPUESTA: Es una herramienta que nos permite hacer consultas SQL a muy baja latencia.Además, también se puede usar
+           desde la interfaz de Hue, por lo que se integra perfectamente con el ecosistema de Hadoop. 
+
+
+PREGUNTA 2: ¿En qué se diferencia de Hive?
+
+REPUESTA: Por el diseño y arquitectura de Apache Impala, su rendimiento puede ser superior al de Apache Hive en varios órdenes de magnitud.
+
+
+PREGUNTA 3: Comando INVALIDATE METADATA, ¿en qué consiste?
+
+RESPUESTA: La instrucción INVALIDATE METADATA marca los metadatos de una o todas las tablas como obsoletas. La próxima vez que el servicio de Impala
+           realice una consulta en una tabla cuyos metadatos estén invalidados, Impala recargará los metadatos asociados antes de continuar con la consulta.
+           Como esta es una operación muy costosa en comparación con la actualización incremental de metadatos realizada por la instrucción REFRESH, cuando sea posible,
+           prefiera REFRESH en lugar de INVALIDATE METADATA.
+
+
+3.5) Calcular el total de EspanolesHombres, espanolesMujeres, ExtranjerosHombres y 
+ExtranjerosMujeres agrupado por DESC_DISTRITO y DESC_BARRIO
+
+
+----> SELECT sum(EspanolesHombres),sum(EspanolesMujeres), sum(ExtranjerosHombres),sum(ExtranjerosMujeres),DESC_DISTRITO,DESC_BARRIO  from padron_parquet_2
+ Group BY DESC_DISTRITO,DESC_BARRIO LIMIT 15;
+
+
+OBSERVACION: Si hacemos la consulta anterior en HIVE observamos que tarda unos 25s mientras que si la hacemos en Impala, tarda menos de 1s. Es bien conocido la baja latencia
+            que presenta Impala, a diferencia de HIVE.
+
+
+
+
+
+
+
+
+
+
+
+
+SECCION 4
+
+
+4.1) CREATE TABLE IF NOT EXISTS padron_particionado(
+COD_DISTRITO int,
+COD_DIST_BARRIO int,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+PARTITIONED BY (DESC_DISTRITO string, DESC_BARRIO string)
+STORED AS PARQUET;
+
+
+4.2)
+
+
+
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=non-strict;
+SET hive.exec.max.dynamic.partitions=10000;
+SET hive.exec.max.dynamic.partitions.pernode=1000;
+SET mapreduce.map.memory.mb=2048;
+SET mapreduce.reduce.memory.mb=2048;
+SET mapreduce.map.java.opts=-Xmx1800m;
+
+INSERT OVERWRITE TABLE padron_particionado PARTITION(DESC_DISTRITO,DESC_BARRIO) SELECT cod_distrito, cod_dist_barrio, cod_barrio, cod_dist_barrio, cod_seccion, 
+cod_edad_int, espanoleshombres, espanolesmujeres, extranjeroshombres, extranjerosmujeres, desc_distrito, desc_barrio FROM padron_parquet_2;
+
+
+dfs -ls -R hdfs://quickstart.cloudera:8020/user/hive/warehouse/datos_padron.db/padron_particionado;
+
+Vemos las particiones: show partitions padron_particionado;
+
+
+
+SELECT sum(EspanolesHombres),sum(EspanolesMujeres), sum(ExtranjerosHombres),sum(ExtranjerosMujeres),DESC_DISTRITO,DESC_BARRIO  from padron_particionado WHERE DESC_DISTRITO='LATINA' OR DESC_DISTRITO='CENTRO'
+ Group BY DESC_DISTRITO,DESC_BARRIO LIMIT 15;
+
+
+
+
+
+

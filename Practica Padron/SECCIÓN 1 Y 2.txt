@@ -1,0 +1,230 @@
+OBJETIVO SECCIÓN 1: Una vez finalizados todos estos apartados deberíamos tener una tabla padron_txt que 
+conserve los espacios innecesarios, no tenga comillas envolviendo los campos y los campos 
+nulos sean tratados como valor 0 y otra tabla padron_txt_2 sin espacios innecesarios, sin 
+comillas envolviendo los campos y con los campos nulos como valor 0. Idealmente esta 
+tabla ha sido creada con las regex de OpenCSV.
+
+
+
+----> CREATE DATABASE datos_padron;
+
+----> USE DATABASE datos_padron;
+
+----> CREATE TEMPORARY TABLE IF NOT EXISTS padron_txt_temp(
+COD_DISTRITO int,
+DESC_DISTRITO string,
+COD_DIST_BARRIO int,
+DESC_BARRIO string,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+WITH SERDEPROPERTIES (
+"separatorChar" = "\;"
+)
+STORED AS TEXTFILE
+TBLPROPERTIES("skip.header.line.count"="1");
+
+
+
+
+----> LOAD DATA LOCAL INPATH '/home/cloudera/Desktop/MisDocumentos/PadronMadrid.csv'
+     INTO TABLE padron_txt_temp;
+
+
+
+----> CREATE TABLE IF NOT EXISTS padron_txt_inter(
+COD_DISTRITO int,
+DESC_DISTRITO string,
+COD_DIST_BARRIO int,
+DESC_BARRIO string,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+STORED AS TEXTFILE;
+
+
+
+----> INSERT INTO table padron_txt_inter SELECT * FROM padron_txt_temp;
+
+
+
+
+----> SELECT * FROM padron_txt_inter LIMIT 5;
+
+
+----> CREATE TABLE IF NOT EXISTS padron_txt
+AS
+SELECT COD_DISTRITO,DESC_DISTRITO, COD_DIST_BARRIO, DESC_BARRIO,COD_BARRIO, COD_DIST_SECCION,COD_SECCION,COD_EDAD_INT, COALESCE(EspanolesHombres,CAST(0 AS BIGINT)) AS EspanolesHombres,
+COALESCE(EspanolesMujeres,CAST(0 AS BIGINT)) AS EspanolesMujeres,COALESCE(ExtranjerosHombres,CAST(0 AS BIGINT)) AS ExtranjerosHombres, COALESCE(ExtranjerosMujeres,CAST(0 AS BIGINT)) 
+AS ExtranjerosMujeres FROM padron_txt_inter;
+
+
+ 
+---->  CREATE TABLE IF NOT EXISTS padron_txt_2
+AS
+SELECT COD_DISTRITO,TRIM(DESC_DISTRITO) AS DESC_DISTRITO, COD_DIST_BARRIO, TRIM(DESC_BARRIO) AS DESC_BARRIO,COD_BARRIO, COD_DIST_SECCION,COD_SECCION, COD_EDAD_INT, 
+COALESCE(EspanolesHombres,CAST(0 AS BIGINT)) AS EspanolesHombres, COALESCE(EspanolesMujeres,CAST(0 AS BIGINT)) AS EspanolesMujeres,
+COALESCE(ExtranjerosHombres,CAST(0 AS BIGINT)) AS ExtranjerosHombres, COALESCE(ExtranjerosMujeres,CAST(0 AS BIGINT)) AS ExtranjerosMujeres FROM padron_txt_inter;
+
+
+
+PREGUNTA: ¿Diferencia de incluir la palabra LOCAL en el comando LOAD DATA?
+
+RESPUESTA: La diferencia es que al indicar LOCAL estamos especifcando que HIVE busque el archivo dentro del gestor de archivos local de propio ordenador,
+           pero sino lo especificamos hacemos que HIVE busque los archivos dentro de HDFS por lo que para poder utilizar un archivo que se encuentre en 
+           LOCAL sin especificarlo, tendremos que previamente cargarlo dentro de HDFS utilizando el comando hdfs dfs -put <ruta local> <ruta hdfs>.
+
+
+
+
+
+TRASTEANDO CON EXPRESIONES REGULARES:
+
+
+
+----> CREATE TEMPORARY TABLE IF NOT EXISTS padron_txt_regex_temp(
+COD_DISTRITO int,
+DESC_DISTRITO string,
+COD_DIST_BARRIO int,
+DESC_BARRIO string,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
+ WITH SERDEPROPERTIES ('input.regex'='\"(.*)\"\;\"(.*)\"\;\"(.*)\"')
+STORED AS TEXTFILE
+TBLPROPERTIES("skip.header.line.count"="1");
+
+
+
+
+
+
+
+OBJETIVO PRIMERO SECCION 2: Crear tabla Hive padron_parquet_2 a través de la tabla padron_txt_2 mediante un 
+CTAS. En este punto deberíamos tener 4 tablas, 2 en txt (padron_txt y 
+padron_txt_2, la primera con espacios innecesarios y la segunda sin espacios 
+innecesarios) y otras dos tablas en formato parquet (padron_parquet y 
+padron_parquet_2, la primera con espacios y la segunda sin ellos).
+
+
+
+
+
+----> CREATE TABLE IF NOT EXISTS padron_parquet(
+COD_DISTRITO int,
+DESC_DISTRITO string,
+COD_DIST_BARRIO int,
+DESC_BARRIO string,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+STORED AS PARQUET;
+
+
+----> INSERT INTO padron_parquet SELECT * FROM padron_txt;
+
+
+
+
+
+----> CREATE TABLE IF NOT EXISTS padron_parquet_2(
+COD_DISTRITO int,
+DESC_DISTRITO string,
+COD_DIST_BARRIO int,
+DESC_BARRIO string,
+COD_BARRIO int,
+COD_DIST_SECCION int,
+COD_SECCION int,
+COD_EDAD_INT int,
+EspanolesHombres int,
+EspanolesMujeres int,
+ExtranjerosHombres int,
+ExtranjerosMujeres int)
+STORED AS PARQUET;
+
+
+
+
+----> INSERT INTO padron_parquet_2 SELECT * FROM padron_txt_2;
+
+
+
+
+
+
+
+
+
+OBJETIVO SEGUNDO SECCIÓN 2: Comparar el tamaño de los ficheros de los datos de las tablas padron_txt (txt), 
+padron_txt_2 (txt pero no incluye los espacios innecesarios), padron_parquet y 
+padron_parquet_2 (alojados en hdfs cuya ruta se puede obtener de la propiedad 
+location de cada tabla por ejemplo haciendo "show create table").
+
+
+
+PASO 1: describe formatted <table_name>
+
+PASO 2: copiamos su localización en HDFS
+
+PASO 3: hive> dfs -du -s -h <localization> 
+
+
+
+
+
+
+
+
+PREGUNTA 1: ¿Qué es CTAS?
+
+RESPUESTA: In Hive, tables can also be created and populated by the results of a query in one create-table-as-select (CTAS) statement.
+           The table created by CTAS is atomic, meaning that the table is not seen by other users until all the query results are populated. 
+           Therefore, other users will either see the table with the complete results of the query or will not see the table at all.
+
+
+
+
+PREGUNTA 2: Investigar en qué consiste el formato columnar parquet y las ventajas de trabajar 
+            con este tipo de formatos.
+
+
+RESPUESTA: Parquet es el formato de almacenamiento en columnas principal en el ecosistema Hadoop. Fue desarrollado por primera vez por 
+           Twitter y Cloudera en cooperación. En mayo de 2015, se graduó de la incubadora Apache y se convirtió en un proyecto Apache de alto nivel.
+	   Las características o ventajas del almacenamiento de columnas como el Parquet se reflejan principalmente en dos aspectos.
+
+
+
+           1. RELACIÓN DE COMPRESIÓN MÁS ALTA
+
+            El almacenamiento de columnas facilita el uso de una codificación y compresión eficientes para cada columna, lo que reduce el espacio en disco.
+             
+
+           2. OPERACIONES IO MÁS PEQUEÑAS
+
+           Utilice la inserción de mapas y la inserción de predicados para leer solo las columnas requeridas y omitir las columnas que no cumplan con las condiciones,
+           lo que puede reducir el escaneo de datos innecesario, traer mejoras de rendimiento y volverse más obvias cuando hay más campos de tabla.
+
+
+
